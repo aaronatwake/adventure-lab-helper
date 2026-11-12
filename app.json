@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "Adventure Lab Helper",
+    "slug": "adventure-lab-helper",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "package": "com.adventurelabhelper.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.adventurelabhelper.app"
+    }
+  }
+}
