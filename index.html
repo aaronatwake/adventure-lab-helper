@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#09111f">
+  <meta name="description" content="Keep Adventure Lab clues, answer attempts, notes, and locations together.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <title>Adventure Lab Helper</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #09111f; color: #f4f7fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(ellipse at top, #142945 0, #09111f 55%); }
+    main { width: min(760px, 100%); margin: 0 auto; padding: 28px 18px 60px; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .eyebrow { color: #8cc5ff; font-size: .75rem; font-weight: 800; letter-spacing: .14em; }
+    h1 { margin: 3px 0 0; font-size: clamp(2rem, 9vw, 2.8rem); line-height: 1.05; }
+    .progress { background: #1b2b43; border-radius: 999px; padding: 9px 13px; white-space: nowrap; font-weight: 700; }
+    .intro { color: #b7c9da; line-height: 1.5; margin: 14px 0 20px; }
+    button { font: inherit; border: 0; border-radius: 11px; padding: 12px 14px; cursor: pointer; font-weight: 700; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 3px solid #8cc5ff; outline-offset: 2px; }
+    .add { width: 100%; color: white; background: #348ee8; margin-bottom: 16px; }
+    .card { background: #12243d; border: 1px solid #21456e; border-radius: 17px; padding: 16px; margin: 0 0 15px; }
+    .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .card-head h2 { font-size: 1.2rem; margin: 0; overflow-wrap: anywhere; }
+    .remove { background: transparent; color: #ff9a9a; padding: 7px; }
+    label { display: block; color: #d8e7f7; font-size: .8rem; font-weight: 700; margin: 12px 0 6px; }
+    input, textarea { width: 100%; border: 1px solid #294363; border-radius: 10px; background: #0d1b2c; padding: 12px; color: #ecf4ff; font: inherit; }
+    textarea { min-height: 82px; resize: vertical; }
+    input::placeholder, textarea::placeholder { color: #8196ad; }
+    .coords { color: #bfd6f2; font-size: .8rem; margin: 12px 0 9px; overflow-wrap: anywhere; }
+    .secondary { width: 100%; background: #1a324d; color: #dceeff; }
+    .copy { width: 100%; margin-top: 10px; background: #2d7f5d; color: #ebfff5; }
+    .notice { min-height: 1.4em; color: #a7dbbc; font-size: .86rem; margin: 10px 0; }
+    .empty { color: #b7c9da; text-align: center; padding: 30px 12px; border: 1px dashed #294363; border-radius: 14px; }
+    footer { color: #8299b2; font-size: .78rem; line-height: 1.5; margin-top: 24px; }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div><div class="eyebrow">ADVENTURE LAB</div><h1>Helper</h1></div>
+      <div class="progress" id="progress" aria-live="polite">0 / 0 answered</div>
+    </header>
+    <p class="intro">Keep clues, your answer attempts, notes, and stop locations together. Your information stays in this browser on this device.</p>
+    <button class="add" id="add-stop" type="button">＋ Add stop</button>
+    <div id="stops"></div>
+    <div class="notice" id="notice" role="status" aria-live="polite"></div>
+    <footer>This is an independent note-taking helper. It does not connect to or submit answers to the Adventure Lab app. Clearing browser data may erase saved stops.</footer>
+  </main>
+  <script>
+    const KEY = 'adventure-lab-helper-stops-v1';
+    const starter = [
+      { id: 'starter-1', title: 'Stop 1', clue: '', answer: '', notes: '', latitude: null, longitude: null },
+      { id: 'starter-2', title: 'Stop 2', clue: '', answer: '', notes: '', latitude: null, longitude: null }
+    ];
+    let stops = loadStops();
+    let noticeTimer;
+
+    function loadStops() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(KEY));
+        return Array.isArray(saved) ? saved : starter;
+      } catch { return starter; }
+    }
+
+    function save() {
+      try { localStorage.setItem(KEY, JSON.stringify(stops)); }
+      catch { showNotice('Could not save. Check available browser storage.'); }
+    }
+
+    function showNotice(message) {
+      const target = document.getElementById('notice');
+      target.textContent = message;
+      clearTimeout(noticeTimer);
+      noticeTimer = setTimeout(() => { target.textContent = ''; }, 3500);
+    }
+
+    function escapeHTML(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+
+    function render() {
+      const answered = stops.filter(stop => stop.answer.trim()).length;
+      document.getElementById('progress').textContent = `${answered} / ${stops.length} answered`;
+      const container = document.getElementById('stops');
+      if (!stops.length) {
+        container.innerHTML = '<div class="empty">No stops yet. Tap “Add stop” to get started.</div>';
+        return;
+      }
+      container.innerHTML = stops.map((stop, index) => {
+        const coords = Number.isFinite(stop.latitude) && Number.isFinite(stop.longitude)
+          ? `Saved location: ${stop.latitude.toFixed(5)}, ${stop.longitude.toFixed(5)}`
+          : 'No location saved';
+        return `<article class="card" data-id="${escapeHTML(stop.id)}">
+          <div class="card-head"><h2>${escapeHTML(stop.title || `Stop ${index + 1}`)}</h2><button class="remove" type="button" data-action="remove" aria-label="Remove ${escapeHTML(stop.title || `Stop ${index + 1}`)}">Remove</button></div>
+          <label>Stop name<input data-field="title" value="${escapeHTML(stop.title)}" placeholder="Name this stop" autocomplete="off"></label>
+          <label>Clue<textarea data-field="clue" placeholder="Write down the clue">${escapeHTML(stop.clue)}</textarea></label>
+          <label>Your answer attempt<textarea data-field="answer" placeholder="Type the answer you think fits">${escapeHTML(stop.answer)}</textarea></label>
+          <label>Notes<textarea data-field="notes" placeholder="Hints or observations">${escapeHTML(stop.notes)}</textarea></label>
+          <div class="coords">${coords}</div>
+          <button class="secondary" type="button" data-action="location">Save my current location</button>
+          <button class="copy" type="button" data-action="copy">Copy answer</button>
+        </article>`;
+      }).join('');
+    }
+
+    document.getElementById('add-stop').addEventListener('click', () => {
+      stops.unshift({ id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), title: `Stop ${stops.length + 1}`, clue: '', answer: '', notes: '', latitude: null, longitude: null });
+      save(); render();
+      document.querySelector('.card input[data-field="title"]')?.focus();
+    });
+
+    document.getElementById('stops').addEventListener('input', event => {
+      const field = event.target.dataset.field;
+      if (!field) return;
+      const card = event.target.closest('.card');
+      const stop = stops.find(item => item.id === card.dataset.id);
+      if (stop) {
+        stop[field] = event.target.value;
+        save();
+        if (field === 'answer') {
+          const count = stops.filter(item => item.answer.trim()).length;
+          document.getElementById('progress').textContent = `${count} / ${stops.length} answered`;
+        }
+        if (field === 'title') card.querySelector('h2').textContent = stop.title || `Stop ${stops.indexOf(stop) + 1}`;
+      }
+    });
+
+    document.getElementById('stops').addEventListener('click', async event => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      const card = button.closest('.card');
+      const stop = stops.find(item => item.id === card.dataset.id);
+      if (!stop) return;
+      if (button.dataset.action === 'remove') {
+        if (confirm(`Remove ${stop.title || 'this stop'}?`)) {
+          stops = stops.filter(item => item.id !== stop.id);
+          save(); render();
+        }
+      } else if (button.dataset.action === 'copy') {
+        if (!stop.answer.trim()) return showNotice('Add an answer before copying.');
+        try {
+          await navigator.clipboard.writeText(stop.answer.trim());
+          showNotice('Answer copied to clipboard.');
+        } catch { showNotice('Clipboard access is unavailable in this browser.'); }
+      } else if (button.dataset.action === 'location') {
+        if (!navigator.geolocation) return showNotice('Location is not supported by this browser.');
+        button.disabled = true;
+        button.textContent = 'Getting location…';
+        navigator.geolocation.getCurrentPosition(position => {
+          stop.latitude = position.coords.latitude;
+          stop.longitude = position.coords.longitude;
+          save(); render(); showNotice('Current location saved.');
+        }, error => {
+          button.disabled = false;
+          button.textContent = 'Save my current location';
+          showNotice(error.code === 1 ? 'Location permission was denied.' : 'Could not get your location. Check permission and try again.');
+        }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
+      }
+    });
+
+    render();
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/service-worker.js').catch(() => {}));
+    }
+  </script>
+</body>
+</html>

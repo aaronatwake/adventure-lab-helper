@@ -1,0 +1,13 @@
+{
+  "name": "Adventure Lab Helper",
+  "short_name": "Lab Helper",
+  "description": "Keep Adventure Lab clues, answer attempts, notes, and locations together.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09111f",
+  "theme_color": "#09111f",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
